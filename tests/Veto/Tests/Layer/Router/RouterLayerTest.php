@@ -44,6 +44,7 @@ class RouterLayerTest extends \PHPUnit_Framework_TestCase
     {
         $stub = $this->getMockBuilder('\Veto\HTTP\Request')
             ->disableOriginalConstructor()
+            ->setMethods(array('getUri', 'getMethod', 'withArgument'))
             ->getMock();
 
         $stub->method('getUri')
@@ -64,8 +65,9 @@ class RouterLayerTest extends \PHPUnit_Framework_TestCase
         $request = $this->buildRequestForMethodAndPath('GET', '/foo');
 
         // Register an expectation that the class name and method name will be set as a _controller parameter
-        $request->expects($this->once())
-            ->method('withParameter')
+        $request
+            ->expects($this->once())
+            ->method('withArgument')
             ->with(
                 $this->equalTo('_controller'),
                 $this->equalTo(
@@ -87,7 +89,7 @@ class RouterLayerTest extends \PHPUnit_Framework_TestCase
 
         // Register an expectation that the class name and method name will be set as a _controller parameter
         $postRequest->expects($this->once())
-            ->method('withParameter')
+            ->method('withArgument')
             ->with(
                 $this->equalTo('_controller'),
                 $this->equalTo(
@@ -115,7 +117,7 @@ class RouterLayerTest extends \PHPUnit_Framework_TestCase
             // withParameter will be called twice, once with the class and method tags, then with the
             // route parameters associated with the matched route
             ->expects($this->exactly(2))
-            ->method('withParameter')
+            ->method('withArgument')
             ->withConsecutive(
                 array(
                     $this->equalTo('_controller'),
