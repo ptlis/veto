@@ -1,114 +1,105 @@
 <?php
-
 /**
  * Veto.
  * PHP Microframework.
  *
  * @author Damien Walsh <me@damow.net>
- * @author brian ridley <ptlis@ptlis.net>
  * @copyright Damien Walsh 2013-2014
  * @version 0.1
  * @package veto
  */
-
 namespace Veto\HTTP;
 
-use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\UriInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UriInterface;
 use Veto\Collection\Bag;
 
 /**
- * Class representing a HTTP request.
- *
+ * Request
  * @since 0.1
  */
-class Request implements ServerRequestInterface
+class Request implements RequestInterface
 {
     /**
-     * The HTTP protocol version.
+     * The HTTP protocol version
      *
      * @var string
      */
-    private $protocolVersion;
+    protected $protocolVersion;
 
     /**
      * The HTTP method
      *
      * @var string
      */
-    private $method;
+    protected $method;
 
     /**
-     * The headers.
-     *
-     * @var HeaderBag
-     */
-    private $headers;
-
-    /**
-     * The request body.
-     *
-     * @var StreamInterface
-     */
-    private $body;
-
-    /**
-     * The Uri of the request.
+     * The URI
      *
      * @var UriInterface
      */
-    private $uri;
+    protected $uri;
 
     /**
-     * Any parameters passed by the server.
+     * The target of the request
+     *
+     * @var string
+     */
+    protected $requestTarget;
+
+    /**
+     * The query string parameters
      *
      * @var Bag
      */
-    private $serverParams;
+    protected $queryParams;
 
     /**
-     * Cookie parameters for the request.
+     * The server environment variables
      *
      * @var Bag
      */
-    private $cookieParams;
+    protected $serverParams;
 
     /**
-     * Query parameters for the request.
+     * The cookies
      *
      * @var Bag
      */
-    private $queryParams;
+    protected $cookies;
 
     /**
-     * The 'parsed body', for example form-encoded POST data.
+     * The headers
+     *
+     * @var HeaderBag
+     */
+    protected $headers;
+
+    /**
+     * The request parameters
      *
      * @var Bag
      */
-    private $parsedBody;
+    protected $parameters;
 
     /**
-     * Any data derived by the application from the request.
+     * The request body
      *
-     * @var Bag
+     * @var StreamInterface
      */
-    private $attributes;
-
+    protected $body;
 
     /**
-     * Constructor.
+     * Create new HTTP request
      *
-     * @param $method
-     * @param UriInterface $uri
-     * @param HeaderBag $headers
-     * @param Bag $cookies
-     * @param Bag $serverParams
-     * @param Bag $queryParams
-     * @param Bag $parsedBody
-     * @param Bag $attributes
-     * @param StreamInterface $body
-     * @param string $protocolVersion
+     * @param string $method The request method
+     * @param UriInterface $uri The request URI object
+     * @param HeaderBag $headers The request headers collection
+     * @param Bag $cookies The request cookies collection
+     * @param Bag $serverParams The server environment variables
+     * @param StreamInterface $body The request body object
      */
     public function __construct(
         $method,
@@ -116,76 +107,46 @@ class Request implements ServerRequestInterface
         HeaderBag $headers,
         Bag $cookies,
         Bag $serverParams,
-        Bag $queryParams,
-        Bag $parsedBody,
-        Bag $attributes,
-        StreamInterface $body,
-        $protocolVersion = '1.1'
+        StreamInterface $body
     ) {
         $this->method = $method;
         $this->uri = $uri;
         $this->headers = $headers;
-        $this->cookieParams = $cookies;
+        $this->cookies = $cookies;
         $this->serverParams = $serverParams;
-        $this->queryParams = $queryParams;
-        $this->parsedBody = $parsedBody;
-        $this->attributes = $attributes;
+        $this->parameters = new Bag();
+        $this->queryParams = new Bag();
         $this->body = $body;
-        $this->protocolVersion = $protocolVersion;
+    }
+
+    /**
+     * Deep-copy any associated objects when cloning.
+     */
+    public function __clone()
+    {
+        $this->headers = clone $this->headers;
+        $this->cookies = clone $this->cookies;
+        $this->parameters = clone $this->parameters;
+        $this->body = clone $this->body;
+        $this->queryParams = clone $this->queryParams;
+        $this->serverParams = clone $this->serverParams;
+        $this->uri = clone $this->uri;
     }
 
     /**
      * Helper method to create a new request based on the provided environment Bag.
      *
+     * @param Bag $environment
      * @return Request
      */
-    public static function createFromEnvironment()
+    public static function createFromEnvironment(Bag $environment)
     {
-        $serverParams = new Bag($_SERVER);
-        $cookieParams = new Bag($_COOKIE);
-        $queryParams = new Bag($_GET);
-        $parsedBody = new Bag($_POST);  // TODO: Be smarter - check content type & (eg) parse JSON automagically?
-
-        $headers = HeaderBag::createFromEnvironment($serverParams);
-
-        $method = $headers->has('X-Http-Method-Override')
-            ? $headers->get('X-Http-Method-Override')
-            : $serverParams->get('REQUEST_METHOD');
-
-        $uri = Uri::createFromEnvironment($serverParams);
+        $method = $environment->get('REQUEST_METHOD');
+        $uri = Uri::createFromEnvironment($environment);
+        $headers = HeaderBag::createFromEnvironment($environment);
         $body = new MessageBody(fopen('php://input', 'r'));
 
-        $protocolVersion = '1.1';
-        if (array_key_exists('SERVER_PROTOCOL', $_SERVER)) {
-            $protocolVersion = substr($_SERVER['SERVER_PROTOCOL'], 5);
-        }
-
-        return new self(
-            $method,
-            $uri,
-            $headers,
-            $cookieParams,
-            $serverParams,
-            $queryParams,
-            $parsedBody,
-            new Bag(),
-            $body,
-            $protocolVersion
-        );
-    }
-
-    /**
-     * Ensures that a deep clone is done so that way collections (etc) are not shared between instances.
-     */
-    private function __clone()
-    {
-        $this->headers = clone $this->headers;
-        $this->body = clone $this->body;
-        $this->uri = clone $this->uri;
-        $this->cookieParams = clone $this->cookieParams;
-        $this->queryParams = clone $this->queryParams;
-        $this->parsedBody = clone $this->parsedBody;
-        $this->attributes = clone $this->attributes;
+        return new self($method, $uri, $headers, new Bag(), $environment, $body);
     }
 
     /**
@@ -201,13 +162,13 @@ class Request implements ServerRequestInterface
     }
 
     /**
-     * Return an instance with the specified HTTP protocol version.
+     * Create a new instance with the specified HTTP protocol version.
      *
      * The version string MUST contain only the HTTP version number (e.g.,
      * "1.1", "1.0").
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
+     * immutability of the message, and MUST return a new instance that has the
      * new protocol version.
      *
      * @param string $version HTTP protocol version
@@ -215,11 +176,6 @@ class Request implements ServerRequestInterface
      */
     public function withProtocolVersion($version)
     {
-        // Note that in theory we may need to support more versions, however for now this should suffice
-        if (!in_array($version, array('1.0', '1.1', '2.0'))) {
-            $version = '1.1';
-        }
-
         $clone = clone $this;
         $clone->protocolVersion = $version;
 
@@ -240,14 +196,14 @@ class Request implements ServerRequestInterface
     }
 
     /**
-     * Return an instance with the provided header, replacing any existing
+     * Create a new instance with the provided header, replacing any existing
      * values of any headers with the same case-insensitive name.
      *
      * While header names are case-insensitive, the casing of the header will
      * be preserved by this function, and returned from getHeaders().
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
+     * immutability of the message, and MUST return a new instance that has the
      * new and/or updated header and value.
      *
      * @param string $name Case-insensitive header field name.
@@ -258,15 +214,14 @@ class Request implements ServerRequestInterface
     public function withHeader($name, $value)
     {
         $clone = clone $this;
-
-        $clone->headers->remove($name);
+        $clone->headers = new HeaderBag();
         $clone->headers->add($name, $value);
 
         return $clone;
     }
 
     /**
-     * Return an instance with the specified header appended with the
+     * Creates a new instance, with the specified header appended with the
      * given value.
      *
      * Existing values for the specified header will be maintained. The new
@@ -274,7 +229,7 @@ class Request implements ServerRequestInterface
      * exist previously, it will be added.
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
+     * immutability of the message, and MUST return a new instance that has the
      * new header and/or value.
      *
      * @param string $name Case-insensitive header field name to add.
@@ -291,12 +246,12 @@ class Request implements ServerRequestInterface
     }
 
     /**
-     * Return an instance without the specified header.
+     * Creates a new instance, without the specified header.
      *
      * Header resolution MUST be done without case-sensitivity.
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that removes
+     * immutability of the message, and MUST return a new instance that removes
      * the named header.
      *
      * @param string $name Case-insensitive header field name to remove.
@@ -321,7 +276,7 @@ class Request implements ServerRequestInterface
     }
 
     /**
-     * Return an instance with the specified message body.
+     * Create a new instance, with the specified message body.
      *
      * The body MUST be a StreamInterface object.
      *
@@ -349,7 +304,7 @@ class Request implements ServerRequestInterface
      *
      * This method acts exactly like MessageInterface::getHeaders(), with one
      * behavioral change: if the Host header has not been previously set, the
-     * method MUST attempt to pull the host component of the composed URI, if
+     * method MUST attempt to pull the host segment of the composed URI, if
      * present.
      *
      * @see MessageInterface::getHeaders()
@@ -359,16 +314,7 @@ class Request implements ServerRequestInterface
      */
     public function getHeaders()
     {
-        $headerList = $this->headers->all();
-
-        if (
-            (!array_key_exists('Host', $headerList) || !strlen($headerList['Host'][0]))
-            && strlen($this->uri->getHost())
-        ) {
-            $headerList['Host'] = $this->uri->getHost();
-        }
-
-        return $headerList;
+        return $this->headers->all();
     }
 
     /**
@@ -378,18 +324,16 @@ class Request implements ServerRequestInterface
      * This method acts exactly like MessageInterface::getHeader(), with
      * one behavioral change: if the Host header is requested, but has
      * not been previously set, the method MUST attempt to pull the host
-     * component of the composed URI, if present.
+     * segment of the composed URI, if present.
      *
      * @see MessageInterface::getHeader()
      * @see UriInterface::getHost()
      * @param string $name Case-insensitive header field name.
-     * @return string[] An array of string values as provided for the given
-     *    header. If the header does not appear in the message, this method MUST
-     *    return an empty array.
+     * @return string
      */
     public function getHeader($name)
     {
-        return $this->headers->get($name);
+        return implode(',', $this->headers->get($name));
     }
 
     /**
@@ -414,7 +358,7 @@ class Request implements ServerRequestInterface
      */
     public function getHeaderLine($name)
     {
-        return implode(',', $this->getHeader($name));
+        return $this->headers->get($name);
     }
 
     /**
@@ -435,11 +379,27 @@ class Request implements ServerRequestInterface
      */
     public function getRequestTarget()
     {
-        // TODO: Implement getRequestTarget() method.
+        if ($this->requestTarget) {
+            return $this->requestTarget;
+        }
+
+        if ($this->uri === null) {
+            return '/';
+        }
+
+        $path = $this->uri->getPath();
+        $query = $this->uri->getQuery();
+        if ($query) {
+            $path .= '?' . $query;
+        }
+
+        $this->requestTarget = $path;
+
+        return $this->requestTarget;
     }
 
     /**
-     * Return an instance with the specific request-target.
+     * Create a new instance with a specific request-target.
      *
      * If the request needs a non-origin-form request-target — e.g., for
      * specifying an absolute-form, authority-form, or asterisk-form —
@@ -447,7 +407,7 @@ class Request implements ServerRequestInterface
      * request-target, verbatim.
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
+     * immutability of the message, and MUST return a new instance that has the
      * changed request target.
      *
      * @link http://tools.ietf.org/html/rfc7230#section-2.7 (for the various
@@ -457,7 +417,16 @@ class Request implements ServerRequestInterface
      */
     public function withRequestTarget($requestTarget)
     {
-        // TODO: Implement withRequestTarget() method.
+        if (preg_match('#\s#', $requestTarget)) {
+            throw new \InvalidArgumentException(
+                'Invalid request target provided; must be a string and cannot contain whitespace'
+            );
+        }
+
+        $clone = clone $this;
+        $clone->requestTarget = $requestTarget;
+
+        return $clone;
     }
 
     /**
@@ -467,18 +436,20 @@ class Request implements ServerRequestInterface
      */
     public function getMethod()
     {
-        return $this->method;
+        $overrideMethod = $this->getHeader('X-Http-Method-Override');
+
+        return $overrideMethod ? $overrideMethod : $this->method;
     }
 
     /**
-     * Return an instance with the provided HTTP method.
+     * Create a new instance with the provided HTTP method.
      *
      * While HTTP method names are typically all uppercase characters, HTTP
      * method names are case-sensitive and thus implementations SHOULD NOT
      * modify the given string.
      *
      * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
+     * immutability of the message, and MUST return a new instance that has the
      * changed request method.
      *
      * @param string $method Case-insensitive method.
@@ -487,7 +458,10 @@ class Request implements ServerRequestInterface
      */
     public function withMethod($method)
     {
-        $this->method = $method;
+        $clone = clone $this;
+        $clone->method = $method;
+
+        return $clone;
     }
 
     /**
@@ -497,7 +471,7 @@ class Request implements ServerRequestInterface
      *
      * @link http://tools.ietf.org/html/rfc3986#section-4.3
      * @return UriInterface Returns a UriInterface instance
-     *     representing the URI of the request.
+     *     representing the URI of the request, if any.
      */
     public function getUri()
     {
@@ -531,295 +505,108 @@ class Request implements ServerRequestInterface
      */
     public function withUri(UriInterface $uri, $preserveHost = false)
     {
+        // Preserve previous host information if omitted from the new uri or if $preserveHost is true
+        if (!strlen($uri->getHost()) || $preserveHost) {
+            $uri = new Uri(
+                $uri->getScheme(),
+                $uri->getHost(),
+                $uri->getPort(),
+                $uri->getPath(),
+                $uri->getQuery(),
+                $uri->getFragment(),
+                $uri->getUserInfo()
+            );
+        }
+
         $clone = clone $this;
         $clone->uri = $uri;
 
-        // Preserve previous host information if omitted from the new uri or if $preserveHost is true
-        if (!strlen($uri->getHost()) || $preserveHost) {
-            $clone->uri = $uri->withHost($this->uri->getHost());
-        }
-
         return $clone;
     }
 
     /**
-     * Retrieve server parameters.
+     * Get the Query String parameters.
      *
-     * Retrieves data related to the incoming request environment,
-     * typically derived from PHP's $_SERVER superglobal. The data IS NOT
-     * REQUIRED to originate from $_SERVER.
-     *
-     * @return array
-     */
-    public function getServerParams()
-    {
-        return $this->serverParams->all();
-    }
-
-    /**
-     * Retrieve cookies.
-     *
-     * Retrieves cookies sent by the client to the server.
-     *
-     * The data MUST be compatible with the structure of the $_COOKIE
-     * superglobal.
-     *
-     * @return array
-     */
-    public function getCookieParams()
-    {
-        return $this->cookieParams->all();
-    }
-
-    /**
-     * Return an instance with the specified cookies.
-     *
-     * The data IS NOT REQUIRED to come from the $_COOKIE superglobal, but MUST
-     * be compatible with the structure of $_COOKIE. Typically, this data will
-     * be injected at instantiation.
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
-     * updated cookie values.
-     *
-     * @param array $cookies Array of key/value pairs representing cookies.
-     * @return self
-     */
-    public function withCookieParams(array $cookies)
-    {
-        $clone = clone $this;
-
-        foreach ($cookies as $key => $value) {
-            $clone->cookieParams->add($key, $value);
-        }
-
-        return $clone;
-    }
-
-    /**
-     * Retrieve query string arguments.
-     *
-     * Retrieves the deserialized query string arguments, if any.
-     *
-     * Note: the query params might not be in sync with the URI or server
-     * params. If you need to ensure you are only getting the original
-     * values, you may need to parse the query string from `getUri()->getQuery()`
-     * or from the `QUERY_STRING` server param.
-     *
-     * @return array
+     * @return Bag
      */
     public function getQueryParams()
     {
-        return $this->queryParams->all();
+        return $this->queryParams;
     }
 
     /**
-     * Return an instance with the specified query string arguments.
+     * Retrieve all parameters for this request.
      *
-     * These values SHOULD remain immutable over the course of the incoming
-     * request. They MAY be injected during instantiation, such as from PHP's
-     * $_GET superglobal, or MAY be derived from some other value such as the
-     * URI. In cases where the arguments are parsed from the URI, the data
-     * MUST be compatible with what PHP's parse_str() would return for
-     * purposes of how duplicate query parameters are handled, and how nested
-     * sets are handled.
-     *
-     * Setting query string arguments MUST NOT change the URI stored by the
-     * request, nor the values in the server params.
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
-     * updated query string arguments.
-     *
-     * @param array $query Array of query string arguments, typically from
-     *     $_GET.
-     * @return self
+     * @return array
      */
-    public function withQueryParams(array $query)
+    public function getParameters()
+    {
+        return $this->parameters->all();
+    }
+
+    /**
+     * Get a parameter of this request.
+     *
+     * @param $key
+     * @param null $default
+     * @return mixed|null
+     */
+    public function getParameter($key, $default = null)
+    {
+        return $this->parameters->get($key, $default);
+    }
+
+    /**
+     * Check if the request has a parameter with the specified key.
+     *
+     * @param $key
+     * @return bool
+     */
+    public function hasParameter($key)
+    {
+        return $this->parameters->has($key);
+    }
+
+    /**
+     * Return a new Request instance with an additional specified parameter.
+     *
+     * @param $key
+     * @param $value
+     * @return Request
+     */
+    public function withParameter($key, $value)
     {
         $clone = clone $this;
-
-        foreach ($query as $key => $value) {
-            $clone->queryParams->add($key, $value);
-        }
+        $clone->parameters->add($key, $value);
 
         return $clone;
     }
 
     /**
-     * Retrieve normalized file upload data.
+     * Return a new Request instance with a replaced, new set of parameters.
      *
-     * This method returns upload metadata in a normalized tree, with each leaf
-     * an instance of Psr\Http\Message\UploadedFileInterface.
-     *
-     * These values MAY be prepared from $_FILES or the message body during
-     * instantiation, or MAY be injected via withUploadedFiles().
-     *
-     * @return array An array tree of UploadedFileInterface instances; an empty
-     *     array MUST be returned if no data is present.
+     * @param $parameters
+     * @return Request
      */
-    public function getUploadedFiles()
-    {
-        // TODO: Implement getUploadedFiles() method.
-    }
-
-    /**
-     * Create a new instance with the specified uploaded files.
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
-     * updated body parameters.
-     *
-     * @param array An array tree of UploadedFileInterface instances.
-     * @return self
-     * @throws \InvalidArgumentException if an invalid structure is provided.
-     */
-    public function withUploadedFiles(array $uploadedFiles)
-    {
-        // TODO: Implement withUploadedFiles() method.
-    }
-
-    /**
-     * Retrieve any parameters provided in the request body.
-     *
-     * If the request Content-Type is either application/x-www-form-urlencoded
-     * or multipart/form-data, and the request method is POST, this method MUST
-     * return the contents of $_POST.
-     *
-     * Otherwise, this method may return any results of deserializing
-     * the request body content; as parsing returns structured content, the
-     * potential types MUST be arrays or objects only. A null value indicates
-     * the absence of body content.
-     *
-     * @return null|array|object The deserialized body parameters, if any.
-     *     These will typically be an array or object.
-     */
-    public function getParsedBody()
-    {
-        return $this->parsedBody->all();
-    }
-
-    /**
-     * Return an instance with the specified body parameters.
-     *
-     * These MAY be injected during instantiation.
-     *
-     * If the request Content-Type is either application/x-www-form-urlencoded
-     * or multipart/form-data, and the request method is POST, use this method
-     * ONLY to inject the contents of $_POST.
-     *
-     * The data IS NOT REQUIRED to come from $_POST, but MUST be the results of
-     * deserializing the request body content. Deserialization/parsing returns
-     * structured data, and, as such, this method ONLY accepts arrays or objects,
-     * or a null value if nothing was available to parse.
-     *
-     * As an example, if content negotiation determines that the request data
-     * is a JSON payload, this method could be used to create a request
-     * instance with the deserialized parameters.
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
-     * updated body parameters.
-     *
-     * @param null|array|object $data The deserialized body data. This will
-     *     typically be in an array or object.
-     * @return self
-     * @throws \InvalidArgumentException if an unsupported argument type is
-     *     provided.
-     */
-    public function withParsedBody($data)
+    public function withParameters($parameters)
     {
         $clone = clone $this;
-
-        foreach ($data as $key => $value) {
-            $clone->parsedBody->add($key, $value);
-        }
+        $clone->parameters = new Bag($parameters);
 
         return $clone;
     }
 
     /**
-     * Retrieve attributes derived from the request.
+     * Return a new Request instance without the specified parameter.
      *
-     * The request "attributes" may be used to allow injection of any
-     * parameters derived from the request: e.g., the results of path
-     * match operations; the results of decrypting cookies; the results of
-     * deserializing non-form-encoded message bodies; etc. Attributes
-     * will be application and request specific, and CAN be mutable.
-     *
-     * @return array Attributes derived from the request.
+     * @param $key
+     * @return Request
      */
-    public function getAttributes()
-    {
-        return $this->attributes->all();
-    }
-
-    /**
-     * Retrieve a single derived request attribute.
-     *
-     * Retrieves a single derived request attribute as described in
-     * getAttributes(). If the attribute has not been previously set, returns
-     * the default value as provided.
-     *
-     * This method obviates the need for a hasAttribute() method, as it allows
-     * specifying a default value to return if the attribute is not found.
-     *
-     * @see getAttributes()
-     * @param string $name The attribute name.
-     * @param mixed $default Default value to return if the attribute does not exist.
-     * @return mixed
-     */
-    public function getAttribute($name, $default = null)
-    {
-        return $this->attributes->get($name, $default);
-    }
-
-    /**
-     * Return an instance with the specified derived request attribute.
-     *
-     * This method allows setting a single derived request attribute as
-     * described in getAttributes().
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that has the
-     * updated attribute.
-     *
-     * @see getAttributes()
-     * @param string $name The attribute name.
-     * @param mixed $value The value of the attribute.
-     * @return self
-     */
-    public function withAttribute($name, $value)
+    public function withoutParameter($key)
     {
         $clone = clone $this;
-
-        $clone->attributes->add($name, $value);
+        $clone->parameters->remove($key);
 
         return $clone;
     }
-
-    /**
-     * Return an instance that removes the specified derived request
-     * attribute.
-     *
-     * This method allows removing a single derived request attribute as
-     * described in getAttributes().
-     *
-     * This method MUST be implemented in such a way as to retain the
-     * immutability of the message, and MUST return an instance that removes
-     * the attribute.
-     *
-     * @see getAttributes()
-     * @param string $name The attribute name.
-     * @return self
-     */
-    public function withoutAttribute($name)
-    {
-        $clone = clone $this;
-
-        $clone->attributes->remove($name);
-
-        return $clone;
-    }
-
 }
