@@ -23,12 +23,14 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
     /**
      * @dataProvider environmentProvider
      *
-     * @param Bag $environment
+     * @param string[] $environment
      * @param string[] $validationData
      */
-    public function testCreateFromEnvironment(Bag $environment, array $validationData)
+    public function testCreateFromEnvironment(array $environment, array $validationData)
     {
-        $uri = Uri::createFromEnvironment($environment);
+        $_SERVER = $environment;
+
+        $uri = Uri::createFromEnvironment();
 
         $this->validateInstance(
             $validationData,
@@ -40,13 +42,13 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
     {
         return array(
             array(
-                'environment' => new Bag(array(
+                'environment' => array(
                     'HTTP_HOST' => 'example.com',
                     'SERVER_PORT' => '80',
                     'SCRIPT_NAME' => '/foo/bar',
                     'REQUEST_URI' => '/foo/bar',
                     'QUERY_STRING' => 'baz=bat'
-                )),
+                ),
                 'validation_data' => array(
                     'scheme' => 'http',
                     'authority' => 'example.com',
@@ -58,13 +60,13 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
                 )
             ),
             'non-standard-port' => array(
-                'environment' => new Bag(array(
+                'environment' => array(
                     'HTTP_HOST' => 'example.com',
                     'SERVER_PORT' => '8080',
                     'SCRIPT_NAME' => '/foo/bar',
                     'REQUEST_URI' => '/foo/bar',
                     'QUERY_STRING' => 'baz=bat'
-                )),
+                ),
                 'validation_data' => array(
                     'scheme' => 'http',
                     'authority' => 'example.com:8080',
@@ -76,7 +78,7 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
                 )
             ),
             'user-info' => array(
-                'environment' => new Bag(array(
+                'environment' => array(
                     'PHP_AUTH_USER' => 'bob',
                     'PHP_AUTH_PW' => 'password',
                     'HTTP_HOST' => 'example.com',
@@ -84,7 +86,7 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
                     'SCRIPT_NAME' => '/foo/bar',
                     'REQUEST_URI' => '/foo/bar',
                     'QUERY_STRING' => 'baz=bat'
-                )),
+                ),
                 'validation_data' => array(
                     'scheme' => 'http',
                     'authority' => 'bob:password@example.com',
@@ -96,14 +98,14 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
                 )
             ),
             'x-forwarded-for' => array(
-                'environment' => new Bag(array(
+                'environment' => array(
                     'HTTP_X_FORWARDED_PROTO' => 'https',
                     'HTTP_HOST' => 'example.com',
                     'SERVER_PORT' => '443',
                     'SCRIPT_NAME' => '/foo/bar',
                     'REQUEST_URI' => '/foo/bar',
                     'QUERY_STRING' => 'baz=bat'
-                )),
+                ),
                 'validation_data' => array(
                     'scheme' => 'https',
                     'authority' => 'example.com',
@@ -115,14 +117,14 @@ class CreateUriFromEnvironmentTest extends AbstractUriTest
                 )
             ),
             'https' => array(
-                'environment' => new Bag(array(
+                'environment' => array(
                     'HTTPS' => 'on',
                     'HTTP_HOST' => 'example.com',
                     'SERVER_PORT' => '443',
                     'SCRIPT_NAME' => '/foo/bar',
                     'REQUEST_URI' => '/foo/bar',
                     'QUERY_STRING' => 'baz=bat'
-                )),
+                ),
                 'validation_data' => array(
                     'scheme' => 'https',
                     'authority' => 'example.com',
