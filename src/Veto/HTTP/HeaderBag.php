@@ -15,21 +15,32 @@ use Veto\Collection\Bag;
 /**
  * HeaderBag - a Bag of HTTP headers
  */
-class HeaderBag extends Bag
+class HeaderBag implements \IteratorAggregate
 {
     /**
-     * Special HTTP headers that do not have the "HTTP_" prefix, for some reason.
-     *
-     * @var array
+     * @var mixed[]
      */
-    protected static $special = array(
-        'CONTENT_TYPE',
-        'CONTENT_LENGTH',
-        'PHP_AUTH_USER',
-        'PHP_AUTH_PW',
-        'PHP_AUTH_DIGEST',
-        'AUTH_TYPE',
-    );
+    protected $headerFields = array();
+
+
+    /**
+     * Initialise the object
+     *
+     * @param array $headerFields The initial fields to create the bag with.
+     */
+    public function __construct(array $headerFields = array())
+    {
+        foreach ($headerFields as $name => $value) {
+
+            // Fields should always be wrapped in an array
+            if (!is_array($value)) {
+                $value = array($value);
+            }
+
+            $normalizedName = $this->normalizeKey($name);
+            $this->headerFields[$normalizedName] = $value;
+        }
+    }
 
     /**
      * Create a new HeaderBag, derived from the provided environment bag.
@@ -41,17 +52,45 @@ class HeaderBag extends Bag
     {
         $headers = new static();
 
-        foreach ($environment as $key => $value) {
-            $key = strtoupper($key);
-            if (strpos($key, 'HTTP_') === 0 || in_array($key, static::$special)) {
-                if ($key === 'HTTP_CONTENT_TYPE' || $key === 'HTTP_CONTENT_LENGTH') {
-                    continue;
-                }
-                $headers->add($key, $value);
+        foreach ($environment->all() as $key => $value) {
+            if ('HTTP_' === substr($key, 0, 5)) {
+                $normalizedKey = static::normalizeFromEnvironment($key);
+
+                $headers->add($normalizedKey, $value);
             }
         }
 
         return $headers;
+    }
+
+    /**
+     * Normalizes the field names from PHP's uppercase HTTP_* style to format in a standard HTTP field.
+     *
+     * @param string $name
+     * @return string
+     */
+    private static function normalizeFromEnvironment($name)
+    {
+        return static::normalizeKey(str_replace('_', '-', substr($name, 5)));
+    }
+
+    /**
+     * Normalises the field names so that they always have the correct casing.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function normalizeKey($name)
+    {
+        return implode(
+            '-',
+            array_map(
+                function($value) {
+                    return ucfirst(strtolower($value));
+                },
+                explode('-', $name)
+            )
+        );
     }
 
     /**
@@ -63,15 +102,13 @@ class HeaderBag extends Bag
      */
     public function add($key, $value)
     {
-        $header = $this->get($key, array());
+        $normalizedKey = $this->normalizeKey($key);
 
-        if (is_array($value)) {
-            $header = array_merge($header, $value);
-        } else {
-            $header[] = $value;
+        if (!array_key_exists($normalizedKey, $this->headerFields)) {
+            $this->headerFields[$normalizedKey] = array();
         }
 
-        parent::add($key, $header);
+        $this->headerFields[$normalizedKey][] = $value;
 
         return $this;
     }
@@ -85,7 +122,11 @@ class HeaderBag extends Bag
      */
     public function get($key, $default = array())
     {
-        return parent::get($this->normalizeKey($key), $default);
+        $normalizedKey = $this->normalizeKey($key);
+
+        return (array_key_exists($normalizedKey, $this->headerFields))
+            ? $this->headerFields[$normalizedKey]
+            : $default;
     }
 
     /**
@@ -96,7 +137,9 @@ class HeaderBag extends Bag
      */
     public function has($key)
     {
-        return array_key_exists($key, $this->items);
+        $normalizedKey = $this->normalizeKey($key);
+
+        return array_key_exists($normalizedKey, $this->headerFields);
     }
 
     /**
@@ -107,7 +150,23 @@ class HeaderBag extends Bag
      */
     public function remove($key)
     {
-        return parent::remove($this->normalizeKey($key));
+        $normalizedKey = $this->normalizeKey($key);
+
+        $value = array();
+        if (array_key_exists($normalizedKey, $this->headerFields)) {
+            $value = $this->headerFields[$normalizedKey];
+            unset($this->headerFields[$normalizedKey]);
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return \ArrayIterator
+     */
+    public function getIterator()
+    {
+        return new \ArrayIterator($this->headerFields);
     }
 
     /**
@@ -117,22 +176,6 @@ class HeaderBag extends Bag
      */
     public function all()
     {
-        return $this->items;
-    }
-
-    /**
-     * Normalize header name, converting it to lower-case
-     *
-     * @param  string $key The case-insensitive header name
-     * @return string Normalized header name
-     */
-    public function normalizeKey($key)
-    {
-        $key = strtolower($key);
-        $key = str_replace(array('-', '-'), ' ', $key);
-        $key = ucwords($key);
-        $key = str_replace(' ', '-', $key);
-
-        return $key;
+        return $this->headerFields;
     }
 }
