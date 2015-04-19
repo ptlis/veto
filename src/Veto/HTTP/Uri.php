@@ -74,6 +74,8 @@ class Uri implements UriInterface
     /**
      * Create a new URI
      *
+     * @todo Accept path first - more likely to change that port!
+     *
      * @param string $scheme URI scheme
      * @param string $host URI host
      * @param int|null $port URI port number
@@ -150,12 +152,13 @@ class Uri implements UriInterface
      *
      * Substantially based on Slim Framework's URI implementation.
      *
-     * @param Bag $environment
      * @link https://github.com/slimphp/Slim/
      * @return self
      */
-    public static function createFromEnvironment(Bag $environment)
+    public static function createFromEnvironment()
     {
+        $environment = new Bag($_SERVER);
+
         // Scheme
         if ($environment->has('HTTP_X_FORWARDED_PROTO') === true) {
             $scheme = $environment->get('HTTP_X_FORWARDED_PROTO');
@@ -171,7 +174,7 @@ class Uri implements UriInterface
         $port = (int)$environment->get('SERVER_PORT', null);
 
         // Path
-        $path = '/' . ltrim($environment->get('SCRIPT_NAME', ''), '/');
+        $path = '/' . ltrim($environment->get('REQUEST_URI', ''), '/');
 
         // Query string
         $queryString = $environment->get('QUERY_STRING', '');
