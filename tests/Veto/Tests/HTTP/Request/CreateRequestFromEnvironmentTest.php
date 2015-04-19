@@ -68,6 +68,57 @@ class CreateRequestFromEnvironmentTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testCreateSimpleHttp11()
+    {
+        $_SERVER = array(
+            'SERVER_PROTOCOL' => 'HTTP/1.0',
+            'REQUEST_METHOD' => 'GET',
+            'REQUEST_URI' => '/foo/bar',
+            'HTTP_HOST' => 'example.com',
+            'HTTP_ACCEPT' => 'text/html,text/json'
+        );
+        $_COOKIE = array(
+            'foo' => 'bar'
+        );
+        $_GET = array(
+            'baz' => 'bat'
+        );
+        $_POST = array();
+
+        $request = Request::createFromEnvironment();
+
+        $this->validateRequest(
+            $request,
+            array(
+                'protocol_version' => '1.0',
+                'method' => 'GET',
+                'uri' => new Uri('http', 'example.com', null, '/foo/bar'),
+                'headers' => array(
+                    'Host' => array(
+                        'example.com'
+                    ),
+                    'Accept' => array(
+                        'text/html,text/json'
+                    )
+                ),
+                'server_params' => array(
+                    'SERVER_PROTOCOL' => 'HTTP/1.0',
+                    'REQUEST_METHOD' => 'GET',
+                    'REQUEST_URI' => '/foo/bar',
+                    'HTTP_HOST' => 'example.com',
+                    'HTTP_ACCEPT' => 'text/html,text/json'
+                ),
+                'cookie_params' => array(
+                    'foo' => 'bar'
+                ),
+                'query_params' => array(
+                    'baz' => 'bat'
+                ),
+                'parsed_body' => array()
+            )
+        );
+    }
+
     private function validateRequest(Request $request, array $expectedValues)
     {
         if (array_key_exists('method', $expectedValues)) {
