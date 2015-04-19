@@ -98,14 +98,14 @@ class RouterLayer extends AbstractContainerAccessor implements InboundLayerInter
                 }
 
                 // Add the matched route's parameters to the request
-                $request = $request->withParameter('_controller', array(
+                $request = $request->withArgument('_controller', array(
                     'class' => $route->getController(),
                     'method' => $route->getAction()
                 ));
 
                 // Add any matched route placeholders to the request parameters
                 foreach ($placeholders as $placeholderKey => $placeholderValue) {
-                    $request = $request->withParameter($placeholderKey, $placeholderValue);
+                    $request = $request->withArgument($placeholderKey, $placeholderValue);
                 }
 
                 $tagged = true;
