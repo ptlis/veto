@@ -11,10 +11,15 @@
 
 namespace Veto\Tests\HTTP\Request;
 
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Adapter\NullAdapter;
+use League\Flysystem\Filesystem;
+use League\Flysystem\MountManager;
 use Veto\Collection\Bag;
 use Veto\HTTP\HeaderBag;
 use Veto\HTTP\MessageBody;
 use Veto\HTTP\Request;
+use Veto\HTTP\UploadedFile;
 use Veto\HTTP\Uri;
 
 class MutateRequestTest extends \PHPUnit_Framework_TestCase
@@ -218,6 +223,34 @@ class MutateRequestTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testWithUploadedFiles()
+    {
+        $uploadedFiles = array(
+            'my_file' => new UploadedFile(
+                new MountManager(array('local' => new Filesystem(new NullAdapter()))),
+                '/tmp/foo/bar',
+                100,
+                UPLOAD_ERR_OK,
+                'foo.jpg',
+                'text/plain'
+            )
+        );
+
+        $originalRequest = $this->getBaseRequest();
+        $newRequest = $originalRequest->withUploadedFiles($uploadedFiles);
+
+
+        $this->assertNotSame(
+            $originalRequest,
+            $newRequest
+        );
+
+        $this->assertEquals(
+            $uploadedFiles,
+            $newRequest->getUploadedFiles()
+        );
+    }
+
     private function getBaseRequest()
     {
         return new Request(
@@ -234,6 +267,7 @@ class MutateRequestTest extends \PHPUnit_Framework_TestCase
                 'HTTP_HOST' => 'example.com',
                 'HTTP_ACCEPT' => 'text/html,text/json'
             )),
+            new Bag(),
             new Bag(),
             new Bag(),
             new Bag(),

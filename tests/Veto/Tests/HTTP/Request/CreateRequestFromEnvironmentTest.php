@@ -11,10 +11,14 @@
 
 namespace Veto\Tests\HTTP\Request;
 
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Filesystem;
+use League\Flysystem\MountManager;
 use Veto\Collection\Bag;
 use Veto\HTTP\HeaderBag;
 use Veto\HTTP\MessageBody;
 use Veto\HTTP\Request;
+use Veto\HTTP\UploadedFile;
 use Veto\HTTP\Uri;
 
 class CreateRequestFromEnvironmentTest extends \PHPUnit_Framework_TestCase
@@ -119,6 +123,76 @@ class CreateRequestFromEnvironmentTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testCreateSimpleUploadedFiles()
+    {
+        $_SERVER = array(
+            'SERVER_PROTOCOL' => 'HTTP/1.0',
+            'REQUEST_METHOD' => 'GET',
+            'REQUEST_URI' => '/foo/bar',
+            'HTTP_HOST' => 'example.com',
+            'HTTP_ACCEPT' => 'text/html,text/json'
+        );
+        $_COOKIE = array(
+            'foo' => 'bar'
+        );
+        $_GET = array(
+            'baz' => 'bat'
+        );
+        $_POST = array();
+        $_FILES = array(
+            'my_file' => array(
+                'name' => 'test.jpg',
+                'type' => 'image/jpeg',
+                'tmp_name' => '/tmp/foo/bar',
+                'error' => 0,
+                'size' => 514123
+            )
+        );
+
+        $request = Request::createFromEnvironment();
+
+        $this->validateRequest(
+            $request,
+            array(
+                'protocol_version' => '1.0',
+                'method' => 'GET',
+                'uri' => new Uri('http', 'example.com', null, '/foo/bar'),
+                'headers' => array(
+                    'Host' => array(
+                        'example.com'
+                    ),
+                    'Accept' => array(
+                        'text/html,text/json'
+                    )
+                ),
+                'server_params' => array(
+                    'SERVER_PROTOCOL' => 'HTTP/1.0',
+                    'REQUEST_METHOD' => 'GET',
+                    'REQUEST_URI' => '/foo/bar',
+                    'HTTP_HOST' => 'example.com',
+                    'HTTP_ACCEPT' => 'text/html,text/json'
+                ),
+                'cookie_params' => array(
+                    'foo' => 'bar'
+                ),
+                'query_params' => array(
+                    'baz' => 'bat'
+                ),
+                'parsed_body' => array(),
+                'files' => array(
+                    'my_file' => new UploadedFile(
+                        new MountManager(array('local' => new Filesystem(new Local('/')))),
+                        '/tmp/foo/bar',
+                        514123,
+                        0,
+                        'test.jpg',
+                        'image/jpeg'
+                    )
+                )
+            )
+        );
+    }
+
     private function validateRequest(Request $request, array $expectedValues)
     {
         if (array_key_exists('method', $expectedValues)) {
@@ -160,6 +234,10 @@ class CreateRequestFromEnvironmentTest extends \PHPUnit_Framework_TestCase
 
         if (array_key_exists('parsed_body', $expectedValues)) {
             $this->assertEquals($expectedValues['parsed_body'], $request->getParsedBody());
+        }
+
+        if (array_key_exists('files', $expectedValues)) {
+            $this->assertEquals($expectedValues['files'], $request->getUploadedFiles());
         }
 
         $this->assertInstanceOf(
