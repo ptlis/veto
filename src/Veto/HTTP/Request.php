@@ -215,11 +215,6 @@ class Request implements ServerRequestInterface
      */
     public function withProtocolVersion($version)
     {
-        // Note that in theory we may need to support more versions, however for now this should suffice
-        if (!in_array($version, array('1.0', '1.1', '2.0'))) {
-            $version = '1.1';
-        }
-
         $clone = clone $this;
         $clone->protocolVersion = $version;
 
