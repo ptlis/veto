@@ -532,8 +532,13 @@ class Request implements ServerRequestInterface
         $clone = clone $this;
         $clone->uri = $uri;
 
-        // Preserve previous host information if omitted from the new uri or if $preserveHost is true
-        if (!strlen($uri->getHost()) || $preserveHost) {
+        // Update the Host header to that of the URI
+        if (!$preserveHost && strlen($uri->getHost())) {
+            $clone->headers->remove('Host');
+            $clone->headers->add('Host', $uri->getHost());
+
+        // Set the host of the Uri to the Host of the request
+        } elseif (!strlen($uri->getHost())) {
             $clone->uri = $uri->withHost($this->uri->getHost());
         }
 
