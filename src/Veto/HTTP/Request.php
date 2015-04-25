@@ -482,7 +482,10 @@ class Request implements ServerRequestInterface
      */
     public function withMethod($method)
     {
-        $this->method = $method;
+        $clone = clone $this;
+        $clone->method = $method;
+
+        return $clone;
     }
 
     /**
