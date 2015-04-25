@@ -13,6 +13,9 @@
 
 namespace Veto\HTTP;
 
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Filesystem;
+use League\Flysystem\MountManager;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Message\StreamInterface;
@@ -20,6 +23,8 @@ use Veto\Collection\Bag;
 
 /**
  * Class representing a HTTP request.
+ *
+ * @todo Include cookie data in headers?
  *
  * @since 0.1
  */
@@ -89,6 +94,13 @@ class Request implements ServerRequestInterface
     private $parsedBody;
 
     /**
+     * The files from the request.
+     *
+     * @var Bag
+     */
+    private $files;
+
+    /**
      * Any data derived by the application from the request.
      *
      * @var Bag
@@ -106,6 +118,7 @@ class Request implements ServerRequestInterface
      * @param Bag $serverParams
      * @param Bag $queryParams
      * @param Bag $parsedBody
+     * @param Bag $files
      * @param Bag $attributes
      * @param StreamInterface $body
      * @param string $protocolVersion
@@ -118,6 +131,7 @@ class Request implements ServerRequestInterface
         Bag $serverParams,
         Bag $queryParams,
         Bag $parsedBody,
+        Bag $files,
         Bag $attributes,
         StreamInterface $body,
         $protocolVersion = '1.1'
@@ -129,6 +143,7 @@ class Request implements ServerRequestInterface
         $this->serverParams = $serverParams;
         $this->queryParams = $queryParams;
         $this->parsedBody = $parsedBody;
+        $this->files = $files;
         $this->attributes = $attributes;
         $this->body = $body;
         $this->protocolVersion = $protocolVersion;
@@ -145,6 +160,26 @@ class Request implements ServerRequestInterface
         $cookieParams = new Bag($_COOKIE);
         $queryParams = new Bag($_GET);
         $parsedBody = new Bag($_POST);  // TODO: Be smarter - check content type & (eg) parse JSON automagically?
+        $files = new Bag();
+
+        // TODO: How do we provided Filesystems? Could we introduce it to Environment?
+        $mountManager = new MountManager(array(
+            'local' => new Filesystem(new Local('/'))
+        ));
+
+        foreach ($_FILES as $name => $file) {
+            $files->add(
+                $name,
+                new UploadedFile(
+                    $mountManager,
+                    $file['tmp_name'],
+                    $file['size'],
+                    $file['error'],
+                    $file['name'],
+                    $file['type']
+                )
+            );
+        }
 
         $headers = HeaderBag::createFromEnvironment($serverParams);
 
@@ -168,6 +203,7 @@ class Request implements ServerRequestInterface
             $serverParams,
             $queryParams,
             $parsedBody,
+            $files,
             new Bag(),
             $body,
             $protocolVersion
@@ -663,7 +699,7 @@ class Request implements ServerRequestInterface
      */
     public function getUploadedFiles()
     {
-        // TODO: Implement getUploadedFiles() method.
+        return $this->files->all();
     }
 
     /**
@@ -679,7 +715,13 @@ class Request implements ServerRequestInterface
      */
     public function withUploadedFiles(array $uploadedFiles)
     {
-        // TODO: Implement withUploadedFiles() method.
+        $clone = clone $this;
+
+        foreach ($uploadedFiles as $name => $file) {
+            $clone->files->add($name, $file);
+        }
+
+        return $clone;
     }
 
     /**
@@ -824,5 +866,4 @@ class Request implements ServerRequestInterface
 
         return $clone;
     }
-
 }
