@@ -251,6 +251,48 @@ class MutateRequestTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testWithAttributes()
+    {
+        $originalRequest = $this->getBaseRequest();
+        $newRequest = $originalRequest->withAttribute('foo', 'bar');
+
+        $this->assertNotSame(
+            $originalRequest,
+            $newRequest
+        );
+
+        $this->assertEquals(
+            array('baz' => 'bat', 'foo' => 'bar'),
+            $newRequest->getAttributes()
+        );
+
+        $this->assertEquals(
+            'bar',
+            $newRequest->getAttribute('foo')
+        );
+    }
+
+    public function testWithoutAttributes()
+    {
+        $originalRequest = $this->getBaseRequest();
+        $newRequest = $originalRequest->withoutAttribute('baz');
+
+        $this->assertNotSame(
+            $originalRequest,
+            $newRequest
+        );
+
+        $this->assertEquals(
+            array(),
+            $newRequest->getAttributes()
+        );
+
+        $this->assertEquals(
+            '',
+            $newRequest->getAttribute('baz')
+        );
+    }
+
     private function getBaseRequest()
     {
         return new Request(
@@ -270,7 +312,7 @@ class MutateRequestTest extends \PHPUnit_Framework_TestCase
             new Bag(),
             new Bag(),
             new Bag(),
-            new Bag(),
+            new Bag(array('baz' => 'bat')),
             new MessageBody(fopen('php://input', 'r')),
             '1.1'
         );
