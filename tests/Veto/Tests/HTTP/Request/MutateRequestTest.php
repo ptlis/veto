@@ -293,6 +293,22 @@ class MutateRequestTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testWithParsedBody()
+    {
+        $originalRequest = $this->getBaseRequest();
+        $newRequest = $originalRequest->withParsedBody(array('foo' => 'bar'));
+
+        $this->assertNotSame(
+            $originalRequest,
+            $newRequest
+        );
+
+        $this->assertEquals(
+            array('foo' => 'bar'),
+            $newRequest->getParsedBody()
+        );
+    }
+
     private function getBaseRequest()
     {
         return new Request(
